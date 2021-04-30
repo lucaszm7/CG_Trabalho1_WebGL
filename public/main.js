@@ -46,23 +46,16 @@ const colorData = [
 
     0, 1, 1,   //V1.color
     1, 0, 1,   //V2.color
-    0, 0, 0,   //V1.color
-];
-
-const transformData = [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
+    1, 1, 0,   //V1.color
 ];
 
 const positionBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.STATIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.DYNAMIC_DRAW);
 
 const colorBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorData), gl.STATIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorData), gl.DYNAMIC_DRAW);
 
 // ========================== 2TH ========================== //
 const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -71,14 +64,18 @@ precision mediump float;
 
 attribute vec3 position;
 attribute vec3 color;
+
 varying vec3 vColor;
+varying vec4 fPosition;
 
 uniform mat4 matrix;
 
 void main() {
     
+    fPosition = matrix * vec4(position, 1);
+
     vColor = color;
-    gl_Position = matrix * vec4(position.x, position.y, position.z , 1);
+    gl_Position = fPosition;
 }
 `);
 gl.compileShader(vertexShader);
@@ -88,9 +85,10 @@ gl.shaderSource(fragmentShader, `
 precision mediump float;
 
 varying vec3 vColor;
+varying vec4 fPosition;
 
 void main() {
-    gl_FragColor = vec4(vColor, 1.0);
+    gl_FragColor = fPosition + vec4(vColor, 1.0);
 }
 `);
 gl.compileShader(fragmentShader);
@@ -120,8 +118,8 @@ const uniformLocation = {
 
 const matrix = mat4.create();
 console.log(matrix);
-mat4.scale(matrix, matrix, [0.1, 0.1, 0.1]);
-mat4.translate(matrix, matrix, [2, 2, 0]);
+mat4.scale(matrix, matrix, [0.2, 0.2, 0.2]);
+mat4.translate(matrix, matrix, [0, 0, 0]);
 
 function animate () {
     requestAnimationFrame(animate);
