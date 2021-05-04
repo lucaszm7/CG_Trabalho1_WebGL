@@ -12,7 +12,12 @@
     </head>
 
     <body>
-        <h1>WebGL!!!</h1>
-        <canvas height="500" width="500"></canvas>
+        <!-- <h1>WebGL!!!</h1> -->
+        <canvas></canvas>
+        <script>
+            const _C = document.getElementsByTagName('canvas')[0];
+            _C.width = window.innerWidth;
+            _C.height = window.innerHeight;
+        </script>
     </body>
 </html>

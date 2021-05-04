@@ -7,55 +7,90 @@ if (!gl) {
     throw new Error ("WebGL not supported");
 }
 
-// === PIPELINE === //
-
-    // 1TH
-    // create an VertexData = [...];
-    // create GpuBuffer;
-    // Attach GpuBuffer to VertexData
-
-    // 2TH
-    // create vertex-shader;
-    // create fragment-shader;
-    // create program;
-    // attach shader to program;
-
-    // 3TH
-    // ennable vertex-attributes;
-
-    // draw
-
-// === END OF PIPE === //
-
 // ========================== 1TH ========================== //
 
 const vertexData = [
-    -1, -1, 0, //V0.position
-    -1,  1, 0,  //V1.position
-     1, -1, 0,  //V2.position
 
-    -1,  1, 0,  //V3.position
-     1, -1, 0,  //V4.position
-     1,  1, 0,   //V5.position
+    //FRONT
+    0.5, 0.5, 0.5, 
+    0.5, -.5, 0.5,  
+    -.5, 0.5, 0.5,  
+
+    -.5, 0.5, 0.5,
+    0.5, -.5, 0.5,
+    -.5, -.5, 0.5,
+
+
+    // Left
+    -.5, 0.5, 0.5,
+    -.5, -.5, 0.5,
+    -.5, 0.5, -.5,
+
+    -.5, 0.5, -.5,
+    -.5, -.5, 0.5,
+    -.5, -.5, -.5,
+
+
+    // Back
+    -.5, 0.5, -.5,
+    -.5, -.5, -.5,
+    0.5, 0.5, -.5,
+
+    0.5, 0.5, -.5,
+    -.5, -.5, -.5,
+    0.5, -.5, -.5,
+
+
+    // Right
+    0.5, 0.5, -.5,
+    0.5, -.5, -.5,
+    0.5, 0.5, 0.5,
+
+    0.5, 0.5, 0.5,
+    0.5, -.5, 0.5,
+    0.5, -.5, -.5,
+
+
+    // Top
+    0.5, 0.5, 0.5,
+    0.5, 0.5, -.5,
+    -.5, 0.5, 0.5,
+
+    -.5, 0.5, 0.5,
+    0.5, 0.5, -.5,
+    -.5, 0.5, -.5,
+
+
+    // Bottom
+    0.5, -.5, 0.5,
+    0.5, -.5, -.5,
+    -.5, -.5, 0.5,
+
+    -.5, -.5, 0.5,
+    0.5, -.5, -.5,
+    -.5, -.5, -.5,
 ];
 
-const colorData = [
-    1, 0, 0,   //V0.color
-    0, 1, 0,   //V1.color
-    0, 0, 1,   //V2.color
+function randomColor () {
+    return [ Math.random(), Math.random(), Math.random()];
+}
 
-    0, 1, 1,   //V1.color
-    1, 0, 1,   //V2.color
-    1, 1, 0,   //V1.color
-];
+
+const colorData = [];
+for (let face = 0; face < 6; face++){
+    let faceColor = randomColor();
+    for (let vertex = 0; vertex < 6; vertex++){
+        colorData.push(...faceColor);
+    }
+}
 
 const positionBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.DYNAMIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.STATIC_DRAW);
 
 const colorBuffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorData), gl.DYNAMIC_DRAW);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorData), gl.STATIC_DRAW);
 
 // ========================== 2TH ========================== //
 const vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -68,11 +103,11 @@ attribute vec3 color;
 varying vec3 vColor;
 varying vec4 fPosition;
 
-uniform mat4 matrix;
+uniform mat4 mvpMatrix;
 
 void main() {
     
-    fPosition = matrix * vec4(position, 1);
+    fPosition = mvpMatrix * vec4(position, 1);
 
     vColor = color;
     gl_Position = fPosition;
@@ -88,7 +123,8 @@ varying vec3 vColor;
 varying vec4 fPosition;
 
 void main() {
-    gl_FragColor = fPosition + vec4(vColor, 1.0);
+    //gl_FragColor = fPosition * vec4(vColor, 1.0);
+    gl_FragColor = vec4(vColor, 1.0);
 }
 `);
 gl.compileShader(fragmentShader);
@@ -111,23 +147,45 @@ gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
 
 gl.useProgram(program);
+gl.enable(gl.DEPTH_TEST);
 
 const uniformLocation = {
-    matrix: gl.getUniformLocation(program, `matrix`),
+    mvpMatrix: gl.getUniformLocation(program, `mvpMatrix`),
 };
 
-const matrix = mat4.create();
-console.log(matrix);
-mat4.scale(matrix, matrix, [0.2, 0.2, 0.2]);
-mat4.translate(matrix, matrix, [0, 0, 0]);
+// CREATE ALL THE MATRIX NEEDED, WORLD MATRIX AND PERSPECTIVE MATRIX
+const modelMatrix = mat4.create();
+const viewMatrix = mat4.create();
+const projectionMatrix = mat4.create();
+mat4.perspective(projectionMatrix,
+    70 * Math.PI/180,//Vertical Field-of-view (angle, radiants)
+    canvas.width/canvas.height, //Aspect-ratio
+    1e-4, // Near-distance    
+    1e4 // Far-distance
+);
+const modelViewMatrix = mat4.create();
+const mvpMatrix = mat4.create();
+
+mat4.translate(modelMatrix, modelMatrix, [-1.5, 0, -2]);
+
+mat4.translate(viewMatrix, viewMatrix, [-3, 0, 1]);
+console.log("VIEW MATRIX: ", viewMatrix);
+mat4.invert(viewMatrix, viewMatrix);
+console.log("VIEW MATRIX AFTER INVERT: ", viewMatrix);
+
 
 function animate () {
     requestAnimationFrame(animate);
-    mat4.rotateZ(matrix, matrix, Math.PI/240);
-    mat4.translate(matrix, matrix, [.02, .02, 0]);
-    mat4.scale(matrix, matrix, [1.0001, 1.0001, 1.0001]);
-    gl.uniformMatrix4fv(uniformLocation.matrix, false, matrix);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    //mat4.rotateZ(modelMatrix, modelMatrix, Math.PI/2 /70);
+    //mat4.rotateX(modelMatrix, modelMatrix, Math.PI/2 /70);
+
+    //MODEL MATRIX WILL BE APPLY FIRST, AFTER THE VIEW MATRIX
+    mat4.multiply(modelViewMatrix, viewMatrix, modelMatrix);
+    //MODEL-VIEW WILL BE APPLY FIRST ON THE MULTIPLICATION, AFTER THE PROJECTION(PERSPECTIVE) MATRIX
+    mat4.multiply(mvpMatrix, projectionMatrix, modelViewMatrix);
+
+    gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
+    gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
 }
 
 animate();
