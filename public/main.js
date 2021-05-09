@@ -1,13 +1,84 @@
+"use strict";
 const mat4 = glMatrix.mat4;
-loadGUI();
+const gui = new dat.GUI();
+var objectsToDraw  = []
 
-var listOfObjetos = []
-
-class Objeto {
-    constructor(){
-        this.modelMatrix = mat4.create();
+class GUIRoot {
+    constructor(vertexData, program, gl, gui, objectsToDraw) {
+        this.vertexData = vertexData;
+        this.program = program;
+        this.gl = gl;
+        this.gui = gui;
+        this.objectsToDraw = objectsToDraw;
+    }
+    addObject() {
+        var objeto = new Objeto(this.vertexData, this.gl)
+        this.objectsToDraw.push(objeto);
+        objeto.bindAttribuites(this.program, this.gl);
+        GUIAddObject(gui, objeto, this.objectsToDraw);
     }
 }
+
+class Objeto {
+    constructor(vertexData, gl){
+        this.translationX = 0;
+        this.translationY = 0;
+        this.translationZ = 0;
+        this.translation = [this.translationX,this.translationY,this.translationZ];
+        this.rotationX = 0;
+        this.rotationY = 0;
+        this.rotationZ = 0;
+        this.rotation = [this.rotationX,this.rotationY,this.rotationZ];
+        this.scaleX = 1;
+        this.scaleY = 1;
+        this.scaleZ = 1;
+        this.scale = [this.scaleX,this.scaleY,this.scaleZ];
+        this.vertexData = vertexData;
+        this.colorData = setColorData();
+        this.vao = gl.createVertexArray();
+        this.modelMatrix = mat4.create();
+        this.matrixMultiply();
+        this.init();
+    };
+
+    //For n attribuites: create another paramenter "indexAttribuites"
+    //that is a list with the string with the names of all attribuites;
+    bindAttribuites(program, gl){
+        gl.bindVertexArray(this.vao);
+        let positionBuffer = gl.createBuffer();
+        let positionLocation = gl.getAttribLocation(program, `a_position`);
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.enableVertexAttribArray(positionLocation);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.vertexData), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+        
+        let colorBuffer = gl.createBuffer();
+        let colorLocation = gl.getAttribLocation(program, `a_color`);
+        gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+        gl.enableVertexAttribArray(colorLocation);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colorData), gl.STATIC_DRAW);
+        gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
+    };
+
+    init(){
+        mat4.translate(this.modelMatrix, this.modelMatrix, [0,0,-3]);
+    }
+
+    matrixMultiply() {
+        mat4.scale(this.modelMatrix, this.modelMatrix, this.scale);
+        mat4.rotateX(this.modelMatrix, this.modelMatrix, this.rotationX * Math.PI/180);
+        mat4.rotateY(this.modelMatrix, this.modelMatrix, this.rotationY * Math.PI/180);
+        mat4.rotateZ(this.modelMatrix, this.modelMatrix, this.rotationZ * Math.PI/180);
+        mat4.translate(this.modelMatrix, this.modelMatrix, this.translation);
+    };
+
+    rotationMultiply(){
+        mat4.rotateX(this.modelMatrix, this.modelMatrix, this.rotationX);
+        mat4.rotateY(this.modelMatrix, this.modelMatrix, this.rotationY);
+        mat4.rotateZ(this.modelMatrix, this.modelMatrix, this.rotationZ);
+    }
+}
+
 
 function randomColor () {
     return [ Math.random(), Math.random(), Math.random()];
@@ -47,48 +118,50 @@ function createProgram(gl, vertexShader, fragmentShader) {
     return program;
 };
 
-const vertexShaderSource = `
-precision mediump float;
+const vertexShaderSource = 
+`#version 300 es
 
-attribute vec3 position;
-attribute vec3 color;
+uniform mat4 u_mvpMatrix;
+uniform vec3 u_translation;
 
-varying vec3 vColor;
-varying vec4 fPosition;
+in vec3 a_position;
+in vec3 a_color;
 
-uniform mat4 mvpMatrix;
+out vec3 v_color;
+out vec4 v_position;
 
 void main() {
-    
-    fPosition = mvpMatrix * vec4(position, 1);
+    vec3 finalPosition = a_position + u_translation;
+    gl_Position = u_mvpMatrix * vec4(finalPosition, 1);
 
-    vColor = color;
-    gl_Position = fPosition;
+    v_position = gl_Position;
+    v_color = a_color;
 }
 `;
 
-const fragmentShaderSource = `
-precision mediump float;
+const fragmentShaderSource = 
+`#version 300 es
+precision highp float;
 
-varying vec3 vColor;
-varying vec4 fPosition;
+in vec3 v_color;
+in vec4 v_position;
+
+out vec4 outColor;
 
 void main() {
-    //gl_FragColor = fPosition * vec4(vColor, 1.0);
-    gl_FragColor = vec4(vColor, 1.0);
+    outColor = vec4(v_color, 1.0);
 }
 `;
 
 function main() {
     const canvas = document.querySelector('canvas');
     const gl = canvas.getContext('webgl2');
-
     if (!gl) {
         throw new Error ("WebGL not supported");
     }
-
+    
     var vertexData = [
-
+        
         //FRONT
         0.5, 0.5, 0.5, 
         0.5, -.5, 0.5,  
@@ -148,38 +221,19 @@ function main() {
         0.5, -.5, -.5,
         -.5, -.5, -.5,
     ];
-    var colorData = setColorData();
-
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.STATIC_DRAW);
-
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorData), gl.STATIC_DRAW);
-
+    
     var vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
     var fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
     var program = createProgram(gl, vertexShader, fragmentShader);
-
-    const positionLocation = gl.getAttribLocation(program, `position`);
-    gl.enableVertexAttribArray(positionLocation);
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
-
-    const colorLocation = gl.getAttribLocation(program, `color`);
-    gl.enableVertexAttribArray(colorLocation);
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
-
-    gl.useProgram(program);
-    gl.enable(gl.DEPTH_TEST);
+    
+    var guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw)
+    loadGUI(gui, guiRoot);
 
     const uniformLocation = {
-        mvpMatrix: gl.getUniformLocation(program, `mvpMatrix`),
+        mvpMatrix: gl.getUniformLocation(program, `u_mvpMatrix`),
+        translationLocation: gl.getUniformLocation(program, `u_translation`),
     };
 
-    var modelMatrix = mat4.create();
     var viewMatrix = mat4.create();
     const projectionMatrix = mat4.create();
     mat4.perspective(projectionMatrix,
@@ -190,27 +244,27 @@ function main() {
     );
     const modelViewMatrix = mat4.create();
     const mvpMatrix = mat4.create();
-
-    mat4.translate(modelMatrix, modelMatrix, [0, 0, -3]);
-    mat4.scale(modelMatrix, modelMatrix, [1, 1, 1]);
-
     mat4.invert(viewMatrix, viewMatrix);
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(drawScene);
+    
+    function drawScene () {
 
-    function animate () {
-
-        mat4.rotateX(modelMatrix, modelMatrix, obj.rotationX);
-        mat4.rotateY(modelMatrix, modelMatrix, obj.rotationY);
-        mat4.rotateZ(modelMatrix, modelMatrix, obj.rotationZ);
-
-        mat4.multiply(modelViewMatrix, viewMatrix, modelMatrix);
-        mat4.multiply(mvpMatrix, projectionMatrix, modelViewMatrix);
-
-        gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
-        gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
-
-        requestAnimationFrame(animate);
+        objectsToDraw.forEach(function(objeto) {
+            gl.bindVertexArray(objeto.vao);
+            gl.useProgram(program);
+            gl.enable(gl.DEPTH_TEST);
+            
+            objeto.rotationMultiply();
+            mat4.multiply(modelViewMatrix, viewMatrix, objeto.modelMatrix);
+            mat4.multiply(mvpMatrix, projectionMatrix, modelViewMatrix);
+            
+            gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
+            gl.uniform3fv(uniformLocation.translationLocation, [objeto.translationX,objeto.translationY,objeto.translationZ]);
+            gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
+        
+        });
+        requestAnimationFrame(drawScene);
     }
 }
 
