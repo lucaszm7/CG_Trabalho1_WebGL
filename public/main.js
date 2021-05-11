@@ -1,7 +1,7 @@
 "use strict";
 const mat4 = glMatrix.mat4;
 const gui = new dat.GUI();
-var objectsToDraw  = []
+const objectsToDraw  = []
 
 class GUIRoot {
     constructor(vertexData, program, gl, gui, objectsToDraw) {
@@ -19,26 +19,54 @@ class GUIRoot {
     }
 }
 
+class Camera {
+    constructor(fieldOfView, aspectRatio, near, far){
+        this.viewMatrix = mat4.create();
+        this.viewX = 0;
+        this.viewY = 0;
+        this.viewZ = 0;
+        mat4.invert(this.viewMatrix, this.viewMatrix);
+        this.projectionMatrix = mat4.create();
+        this.fieldOfView = fieldOfView;
+        this.aspectRatio = aspectRatio;
+        this.near = near;
+        this.far = far;
+        mat4.perspective(this.projectionMatrix,
+                        degToRad(fieldOfView),
+                        aspectRatio,
+                        near,
+                        far);
+    }
+    computeProjection(){
+        mat4.perspective(this.projectionMatrix,
+            degToRad(this.fieldOfView),
+            this.aspectRatio,
+            this.near,
+            this.far);
+    }
+    computeView(){
+        var auxView = mat4.create();
+        mat4.translate(this.viewMatrix, auxView, [this.viewX, this.viewY, this.viewZ]);
+        mat4.invert(this.viewMatrix, this.viewMatrix);
+    }
+}
+
 class Objeto {
     constructor(vertexData, gl){
         this.translationX = 0;
         this.translationY = 0;
-        this.translationZ = 0;
-        this.translation = [this.translationX,this.translationY,this.translationZ];
+        this.translationZ = -6;
         this.rotationX = 0;
         this.rotationY = 0;
         this.rotationZ = 0;
-        this.rotation = [this.rotationX,this.rotationY,this.rotationZ];
         this.scaleX = 1;
         this.scaleY = 1;
         this.scaleZ = 1;
-        this.scale = [this.scaleX,this.scaleY,this.scaleZ];
         this.vertexData = vertexData;
         this.colorData = setColorData();
         this.vao = gl.createVertexArray();
         this.modelMatrix = mat4.create();
         this.matrixMultiply();
-        this.init();
     };
 
     //For n attribuites: create another paramenter "indexAttribuites"
@@ -60,30 +88,31 @@ class Objeto {
         gl.vertexAttribPointer(colorLocation, 3, gl.FLOAT, false, 0, 0);
     };
 
-    init(){
-        mat4.translate(this.modelMatrix, this.modelMatrix, [0,0,-3]);
-    }
-
     matrixMultiply() {
-        mat4.scale(this.modelMatrix, this.modelMatrix, this.scale);
-        mat4.rotateX(this.modelMatrix, this.modelMatrix, this.rotationX * Math.PI/180);
-        mat4.rotateY(this.modelMatrix, this.modelMatrix, this.rotationY * Math.PI/180);
-        mat4.rotateZ(this.modelMatrix, this.modelMatrix, this.rotationZ * Math.PI/180);
-        mat4.translate(this.modelMatrix, this.modelMatrix, this.translation);
+        var auxMatrix = mat4.create();
+        mat4.translate(auxMatrix, auxMatrix, [this.translationX,this.translationY,this.translationZ]);
+        mat4.rotateX(auxMatrix, auxMatrix, degToRad(this.rotationX));
+        mat4.rotateY(auxMatrix, auxMatrix, degToRad(this.rotationY));
+        mat4.rotateZ(auxMatrix, auxMatrix, degToRad(this.rotationZ));
+        mat4.scale(this.modelMatrix, auxMatrix, [this.scaleX,this.scaleY,this.scaleZ]);
     };
-
-    rotationMultiply(){
-        mat4.rotateX(this.modelMatrix, this.modelMatrix, this.rotationX);
-        mat4.rotateY(this.modelMatrix, this.modelMatrix, this.rotationY);
-        mat4.rotateZ(this.modelMatrix, this.modelMatrix, this.rotationZ);
-    }
 }
 
-
+function degToRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+function projection (width, height, depth) {
+    // Note: This matrix flips the Y axis so 0 is at the top.
+    return [
+       2 / width, 0, 0, 0,
+       0, -2 / height, 0, 0,
+       0, 0, 2 / depth, 0,
+      -1, 1, 0, 1,
+    ];
+}
 function randomColor () {
     return [ Math.random(), Math.random(), Math.random()];
 }
-
 function setColorData () {
     let colorDataAux = [];
     for (let face = 0; face < 6; face++){
@@ -94,7 +123,6 @@ function setColorData () {
     }
     return colorDataAux;
 }
-
 function compileShader(gl, shaderSource, shaderType) {
     var shader = gl.createShader(shaderType);
     gl.shaderSource(shader, shaderSource);
@@ -105,7 +133,6 @@ function compileShader(gl, shaderSource, shaderType) {
     }
     return shader;
 };
-
 function createProgram(gl, vertexShader, fragmentShader) {
     var program = gl.createProgram();
     gl.attachShader(program, vertexShader);
@@ -122,7 +149,7 @@ const vertexShaderSource =
 `#version 300 es
 
 uniform mat4 u_mvpMatrix;
-uniform vec3 u_translation;
+uniform vec2 u_resolution;
 
 in vec3 a_position;
 in vec3 a_color;
@@ -131,8 +158,7 @@ out vec3 v_color;
 out vec4 v_position;
 
 void main() {
-    vec3 finalPosition = a_position + u_translation;
-    gl_Position = u_mvpMatrix * vec4(finalPosition, 1);
+    gl_Position = u_mvpMatrix * vec4(a_position, 1);
 
     v_position = gl_Position;
     v_color = a_color;
@@ -154,6 +180,7 @@ void main() {
 `;
 
 function main() {
+
     const canvas = document.querySelector('canvas');
     const gl = canvas.getContext('webgl2');
     if (!gl) {
@@ -162,17 +189,17 @@ function main() {
     
     var vertexData = [
         
-        //FRONT
+        //Frente
+        -.5, 0.5, 0.5,  
         0.5, 0.5, 0.5, 
         0.5, -.5, 0.5,  
-        -.5, 0.5, 0.5,  
 
         -.5, 0.5, 0.5,
         0.5, -.5, 0.5,
         -.5, -.5, 0.5,
 
 
-        // Left
+        // Esquerda
         -.5, 0.5, 0.5,
         -.5, -.5, 0.5,
         -.5, 0.5, -.5,
@@ -182,7 +209,7 @@ function main() {
         -.5, -.5, -.5,
 
 
-        // Back
+        // Atrás
         -.5, 0.5, -.5,
         -.5, -.5, -.5,
         0.5, 0.5, -.5,
@@ -192,7 +219,7 @@ function main() {
         0.5, -.5, -.5,
 
 
-        // Right
+        // Direita
         0.5, 0.5, -.5,
         0.5, -.5, -.5,
         0.5, 0.5, 0.5,
@@ -202,7 +229,7 @@ function main() {
         0.5, -.5, -.5,
 
 
-        // Top
+        // Cima
         0.5, 0.5, 0.5,
         0.5, 0.5, -.5,
         -.5, 0.5, 0.5,
@@ -212,7 +239,7 @@ function main() {
         -.5, 0.5, -.5,
 
 
-        // Bottom
+        // Baixo
         0.5, -.5, 0.5,
         0.5, -.5, -.5,
         -.5, -.5, 0.5,
@@ -226,43 +253,37 @@ function main() {
     var fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
     var program = createProgram(gl, vertexShader, fragmentShader);
     
-    var guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw)
-    loadGUI(gui, guiRoot);
+    const camera = new Camera(75, canvas.width/canvas.height, 1e-4, 1e4);
+    var guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
+    loadGUI(gui, guiRoot, camera);
 
     const uniformLocation = {
         mvpMatrix: gl.getUniformLocation(program, `u_mvpMatrix`),
-        translationLocation: gl.getUniformLocation(program, `u_translation`),
     };
-
-    var viewMatrix = mat4.create();
-    const projectionMatrix = mat4.create();
-    mat4.perspective(projectionMatrix,
-        75 * Math.PI/180,//Vertical Field-of-view (angle, radiants)
-        canvas.width/canvas.height, //Aspect-ratio
-        1e-4, // Near-distance    
-        1e4 // Far-distance
-    );
     const modelViewMatrix = mat4.create();
     const mvpMatrix = mat4.create();
-    mat4.invert(viewMatrix, viewMatrix);
 
     requestAnimationFrame(drawScene);
     
     function drawScene () {
 
         objectsToDraw.forEach(function(objeto) {
-            gl.bindVertexArray(objeto.vao);
+
             gl.useProgram(program);
+            gl.bindVertexArray(objeto.vao);
+            //gl.enable(gl.CULL_FACE);
             gl.enable(gl.DEPTH_TEST);
-            
-            objeto.rotationMultiply();
-            mat4.multiply(modelViewMatrix, viewMatrix, objeto.modelMatrix);
-            mat4.multiply(mvpMatrix, projectionMatrix, modelViewMatrix);
+
+            objeto.matrixMultiply();
+            camera.computeView();
+            camera.computeProjection();
+            // let moveOriginMatrix = mat4.create();
+            // mat4.translate(objeto.modelMatrix, objeto.modelMatrix, moveOriginMatrix);
+            mat4.multiply(modelViewMatrix, camera.viewMatrix, objeto.modelMatrix);
+            mat4.multiply(mvpMatrix, camera.projectionMatrix, modelViewMatrix);
             
             gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
-            gl.uniform3fv(uniformLocation.translationLocation, [objeto.translationX,objeto.translationY,objeto.translationZ]);
             gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
-        
         });
         requestAnimationFrame(drawScene);
     }
