@@ -55,7 +55,7 @@ class Objeto {
     constructor(vertexData, gl){
         this.translationX = 0;
         this.translationY = 0;
-        this.translationZ = -6;
+        this.translationZ = -20;
         this.rotationX = 0;
         this.rotationY = 0;
         this.rotationZ = 0;
@@ -253,7 +253,7 @@ function main() {
     var fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
     var program = createProgram(gl, vertexShader, fragmentShader);
     
-    const camera = new Camera(75, canvas.width/canvas.height, 1e-4, 1e4);
+    const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1e-4, 100);
     var guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
     loadGUI(gui, guiRoot, camera);
 
