@@ -1,5 +1,8 @@
-const loadGUI = (gui, guiRoot, camera) => {
+const loadGUI = (gui, guiRoot, camera, animation) => {
   gui.add(guiRoot, "addObject");
+  const animationFolder = gui.addFolder("Animation");
+  animationFolder.add(animation, "object", [0, 1, 2, 3, 4, 5]);
+  animationFolder.add(animation, "animate");
   const cameraFolder = gui.addFolder("Camera");
   const ProjectionFolder = cameraFolder.addFolder("Projection");
   ProjectionFolder.add(camera, "fieldOfView", -180, 180, 10);
@@ -10,6 +13,10 @@ const loadGUI = (gui, guiRoot, camera) => {
   viewFolder.add(camera, "viewX", -3, 3, 0.1);
   viewFolder.add(camera, "viewY", -3, 3, 0.1);
   viewFolder.add(camera, "viewZ", -3, 3, 0.1);
+  const rotationFolder = cameraFolder.addFolder("Rotation");
+  rotationFolder.add(camera, "rotationX", -180, 180, 15);
+  rotationFolder.add(camera, "rotationY", -180, 180, 15);
+  rotationFolder.add(camera, "rotationZ", -180, 180, 15);
 };
 
 const GUIAddObject = (gui, object, objectsToDraw) => {

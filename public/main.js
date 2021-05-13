@@ -11,6 +11,7 @@ class GUIRoot {
         this.gui = gui;
         this.objectsToDraw = objectsToDraw;
     }
+    
     addObject() {
         var objeto = new Objeto(this.vertexData, this.gl)
         this.objectsToDraw.push(objeto);
@@ -18,13 +19,67 @@ class GUIRoot {
         GUIAddObject(gui, objeto, this.objectsToDraw);
     }
 }
+class Animation {
+    constructor(gl, gui, program, objectsToDraw, camera, viewProjectionMatrix, mvpMatrix){
+        this.program = program;
+        this.gl = gl;
+        this.gui = gui;
+        this.objectsToDraw = objectsToDraw;
+        this.camera = camera;
+        this.object = null;
+        this.uniformLocation = {
+            mvpMatrix: this.gl.getUniformLocation(this.program, `u_mvpMatrix`),
+        };
+        
+        this.viewProjectionMatrix = viewProjectionMatrix;
+        this.mvpMatrix = mvpMatrix
+    
+        this.rotationSpeed = radToDeg(1.2);
+        this.then = 0;
+        //Radianos por segundo
+    }
+    callAnimete(){
+        requestAnimationFrame(this.animate);
+    }
+    animate(now){
+        if(now == null){
+            now = 0;
+        }
+        now *= 0.001;
+        var deltaTime = now - this.then;
+        this.then = now;
 
+        this.gl.useProgram(this.program);
+        this.gl.bindVertexArray(this.objectsToDraw[this.object].vao);
+        this.gl.enable(this.gl.DEPTH_TEST);
+        
+        this.objectsToDraw[this.object].rotationX += this.rotationSpeed * deltaTime;
+        console.log(this.objectsToDraw[this.object].rotationX);
+        this.objectsToDraw[this.object].matrixMultiply();
+        this.camera.computeView();
+        this.camera.computeProjection();
+
+        mat4.multiply(this.viewProjectionMatrix, this.camera.viewMatrix, this.camera.projectionMatrix);
+        mat4.multiply(this.mvpMatrix, this.viewProjectionMatrix, this.objectsToDraw[this.object].modelMatrix);
+        
+        this.gl.uniformMatrix4fv(this.uniformLocation.mvpMatrix, false, this.mvpMatrix);
+        this.gl.drawArrays(this.gl.TRIANGLES, 0, this.objectsToDraw[this.object].vertexData.length / 3);
+
+        if(this.objectsToDraw[this.object].rotationX <= 60){
+            requestAnimationFrame(this.animate);
+        }
+    }
+}
 class Camera {
     constructor(fieldOfView, aspectRatio, near, far){
+        this.up = [0, 1, 0];
         this.viewMatrix = mat4.create();
         this.viewX = 0;
         this.viewY = 0;
         this.viewZ = 0;
+        this.rotationX = 0;
+        this.rotationY = 0;
+        this.rotationZ = 0;
         mat4.invert(this.viewMatrix, this.viewMatrix);
         this.projectionMatrix = mat4.create();
         this.fieldOfView = fieldOfView;
@@ -44,13 +99,16 @@ class Camera {
             this.near,
             this.far);
     }
-    computeView(){
+    computeView(lookingAt){
         var auxView = mat4.create();
-        mat4.translate(this.viewMatrix, auxView, [this.viewX, this.viewY, this.viewZ]);
-        mat4.invert(this.viewMatrix, this.viewMatrix);
+        mat4.rotateX(auxView, auxView, degToRad(this.rotationX));
+        mat4.rotateY(auxView, auxView, degToRad(this.rotationY));
+        mat4.rotateZ(auxView, auxView, degToRad(this.rotationZ));
+        mat4.translate(auxView, auxView, [this.viewX, this.viewY, this.viewZ]);
+        //mat4.lookAt(auxView, [auxView[12],auxView[13],auxView[14]], lookingAt, this.up);
+        mat4.invert(this.viewMatrix, auxView);
     }
 }
-
 class Objeto {
     constructor(vertexData, gl){
         this.translationX = 0;
@@ -89,7 +147,7 @@ class Objeto {
     };
 
     matrixMultiply() {
-        var auxMatrix = mat4.create();
+        let auxMatrix = mat4.create();
         mat4.translate(auxMatrix, auxMatrix, [this.translationX,this.translationY,this.translationZ]);
         mat4.rotateX(auxMatrix, auxMatrix, degToRad(this.rotationX));
         mat4.rotateY(auxMatrix, auxMatrix, degToRad(this.rotationY));
@@ -97,18 +155,11 @@ class Objeto {
         mat4.scale(this.modelMatrix, auxMatrix, [this.scaleX,this.scaleY,this.scaleZ]);
     };
 }
-
 function degToRad(degrees) {
     return degrees * Math.PI / 180;
 }
-function projection (width, height, depth) {
-    // Note: This matrix flips the Y axis so 0 is at the top.
-    return [
-       2 / width, 0, 0, 0,
-       0, -2 / height, 0, 0,
-       0, 0, 2 / depth, 0,
-      -1, 1, 0, 1,
-    ];
+function radToDeg(r) {
+    return r * 180 / Math.PI;
 }
 function randomColor () {
     return [ Math.random(), Math.random(), Math.random()];
@@ -249,38 +300,53 @@ function main() {
         -.5, -.5, -.5,
     ];
     
-    var vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
-    var fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
-    var program = createProgram(gl, vertexShader, fragmentShader);
+    const vertexShader = compileShader(gl, vertexShaderSource, gl.VERTEX_SHADER);
+    const fragmentShader = compileShader(gl, fragmentShaderSource, gl.FRAGMENT_SHADER);
+    const program = createProgram(gl, vertexShader, fragmentShader);
     
-    const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1e-4, 100);
-    var guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
-    loadGUI(gui, guiRoot, camera);
+    const viewProjectionMatrix = mat4.create();
+    const mvpMatrix = mat4.create();
+
+    const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 10000);
+    const guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
+    const animation = new Animation(gl, gui, program, objectsToDraw, camera, viewProjectionMatrix, mvpMatrix);
+    loadGUI(gui, guiRoot, camera, animation);
 
     const uniformLocation = {
         mvpMatrix: gl.getUniformLocation(program, `u_mvpMatrix`),
     };
-    const modelViewMatrix = mat4.create();
-    const mvpMatrix = mat4.create();
+    
+
+
+    var then = 0;
+    //Radianos por segundo
+    var rotationSpeed = radToDeg(1.2);
 
     requestAnimationFrame(drawScene);
-    
-    function drawScene () {
+    function drawScene (now) {
 
+        now *= 0.001;
+        var deltaTime = now - then;
+        then = now;
         objectsToDraw.forEach(function(objeto) {
-
             gl.useProgram(program);
             gl.bindVertexArray(objeto.vao);
             //gl.enable(gl.CULL_FACE);
             gl.enable(gl.DEPTH_TEST);
 
+            if(objeto.animation){
+                objeto.rotationX += rotationSpeed * deltaTime;
+                if(objeto.rotationX >= 60){
+                    objeto.animation = false;
+                }
+            }
+
             objeto.matrixMultiply();
             camera.computeView();
             camera.computeProjection();
-            // let moveOriginMatrix = mat4.create();
-            // mat4.translate(objeto.modelMatrix, objeto.modelMatrix, moveOriginMatrix);
-            mat4.multiply(modelViewMatrix, camera.viewMatrix, objeto.modelMatrix);
-            mat4.multiply(mvpMatrix, camera.projectionMatrix, modelViewMatrix);
+
+            mat4.multiply(viewProjectionMatrix, camera.viewMatrix, camera.projectionMatrix);
+            mat4.multiply(mvpMatrix, viewProjectionMatrix, objeto.modelMatrix);
             
             gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
             gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
