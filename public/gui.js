@@ -1,8 +1,8 @@
 const loadGUI = (gui, guiRoot, camera, animation) => {
   gui.add(guiRoot, "addObject");
   const animationFolder = gui.addFolder("Animation");
-  animationFolder.add(animation, "object", [0, 1, 2, 3, 4, 5]);
-  animationFolder.add(animation, "animate");
+  //animationFolder.add(animation, "rotationX", -180, 180, 15);
+  animationFolder.add(animation, "animateRotate");
   const cameraFolder = gui.addFolder("Camera");
   const ProjectionFolder = cameraFolder.addFolder("Projection");
   ProjectionFolder.add(camera, "fieldOfView", -180, 180, 10);
