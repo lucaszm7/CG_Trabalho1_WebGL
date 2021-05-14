@@ -76,7 +76,7 @@ class Camera {
         this.viewMatrix = mat4.create();
         this.viewX = 0;
         this.viewY = 0;
-        this.viewZ = 0;
+        this.viewZ = 10;
         this.rotationX = 0;
         this.rotationY = 0;
         this.rotationZ = 0;
@@ -98,21 +98,22 @@ class Camera {
             this.near,
             this.far);
     }
-    computeView(lookingAt){
-        var auxView = mat4.create();
-        mat4.rotateX(auxView, auxView, degToRad(this.rotationX));
-        mat4.rotateY(auxView, auxView, degToRad(this.rotationY));
-        mat4.rotateZ(auxView, auxView, degToRad(this.rotationZ));
-        mat4.translate(auxView, auxView, [this.viewX, this.viewY, this.viewZ]);
-        //mat4.lookAt(auxView, [auxView[12],auxView[13],auxView[14]], lookingAt, this.up);
-        mat4.invert(this.viewMatrix, auxView);
+    computeView(lookingAt=[0,0,0]){
+        var cameraMatrix = mat4.create();
+        mat4.targetTo(cameraMatrix, [this.viewX,this.viewY,this.viewZ], lookingAt, this.up);
+        mat4.rotateX(cameraMatrix, cameraMatrix, degToRad(this.rotationX));
+        mat4.rotateY(cameraMatrix, cameraMatrix, degToRad(this.rotationY));
+        mat4.rotateZ(cameraMatrix, cameraMatrix, degToRad(this.rotationZ));
+        mat4.translate(cameraMatrix, cameraMatrix, [this.viewX, this.viewY, this.viewZ]);
+        
+        mat4.invert(this.viewMatrix, cameraMatrix);
     }
 }
 class Objeto {
     constructor(vertexData, gl){
         this.translationX = 0;
         this.translationY = 0;
-        this.translationZ = -20;
+        this.translationZ = 0;
         this.rotationX = 0;
         this.rotationY = 0;
         this.rotationZ = 0;
@@ -121,6 +122,7 @@ class Objeto {
         this.scaleZ = 1;
         this.vertexData = vertexData;
         this.changeColors = false;
+        this.lookAt = false;
         this.colorData = setColorData();
         this.vao = gl.createVertexArray();
         this.modelMatrix = mat4.create();
@@ -446,12 +448,13 @@ function main() {
         },
     }
 
-    const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 10000);
+    const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 1000);
     const guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
     loadGUI(gui, guiRoot, camera, animation);
 
     requestAnimationFrame(drawScene);
 
+    var lookingAt = [0,0,0];
     function drawScene () {
 
         objectsToDraw.forEach(function(objeto) {
@@ -460,12 +463,16 @@ function main() {
             gl.bindVertexArray(objeto.vao);
             //gl.enable(gl.CULL_FACE);
             gl.enable(gl.DEPTH_TEST);
+            
+            if(objeto.lookAt){
+                lookingAt = [objeto.modelMatrix[12],objeto.modelMatrix[13],objeto.modelMatrix[14]]
+            }
 
             objeto.matrixMultiply();
-            camera.computeView();
+            camera.computeView(lookingAt);
             camera.computeProjection();
 
-            mat4.multiply(viewProjectionMatrix, camera.viewMatrix, camera.projectionMatrix);
+            mat4.multiply(viewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
             mat4.multiply(mvpMatrix, viewProjectionMatrix, objeto.modelMatrix);
             gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
             gl.uniform1i(uniformLocation.changeColors, objeto.changeColors);
