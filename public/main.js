@@ -311,48 +311,66 @@ function main() {
 
     var then = 0;
     var then_animation = 0;
+
     var animation = {
-        
-        //Degrees por segundo
-        rotationSpeed: radToDeg(2),
-        objeto: null,
-        rotationBegin: null,
-        rotationX: 60,
+        //Graus por segundo
+        rotationSpeed: 20,
+        indexOfObjeto: 0,
+        objetos: [0, 1, 2, 3, 4],
+        rotationBeginX: null,
+        rotationBeginY: null,
+        rotationBeginZ: null,
+        rotationX: 0,
+        rotationY: 0,
+        rotationZ: 0,
         animateRotate: function(){
             requestAnimationFrame(animation.rotate);
         },
-
         rotate: function (now) {
-            now *= 0.0001;
+            now *= 0.001;
             if(then_animation == 0){
                 then_animation = now;
-                animation.rotationBegin = objectsToDraw[0].rotationX;
+                console.log(animation.indexOfObjeto);
+                animation.rotationBeginX = objectsToDraw[animation.indexOfObjeto].rotationX;
+                animation.rotationBeginY = objectsToDraw[animation.indexOfObjeto].rotationY;
+                animation.rotationBeginZ = objectsToDraw[animation.indexOfObjeto].rotationZ;
             }
             var deltaTime = now - then_animation;
             then_animation = now;
             gl.useProgram(program);
-            gl.bindVertexArray(objectsToDraw[0].vao);
+            gl.bindVertexArray(objectsToDraw[animation.indexOfObjeto].vao);
             //gl.enable(gl.CULL_FACE);
             gl.enable(gl.DEPTH_TEST);
             
-            objectsToDraw[0].rotationX += animation.rotationSpeed * deltaTime;
-            objectsToDraw[0].matrixMultiply();
+            if(objectsToDraw[animation.indexOfObjeto].rotationX - animation.rotationBeginX <= animation.rotationX){
+                objectsToDraw[animation.indexOfObjeto].rotationX += animation.rotationSpeed * deltaTime;
+            }
+            if(objectsToDraw[animation.indexOfObjeto].rotationY - animation.rotationBeginY <= animation.rotationY){
+                objectsToDraw[animation.indexOfObjeto].rotationY += animation.rotationSpeed * deltaTime;
+            }
+            if(objectsToDraw[animation.indexOfObjeto].rotationZ - animation.rotationBeginZ <= animation.rotationZ){
+                objectsToDraw[animation.indexOfObjeto].rotationZ += animation.rotationSpeed * deltaTime;
+            }
+            objectsToDraw[animation.indexOfObjeto].matrixMultiply();
             camera.computeView();
             camera.computeProjection();
 
             mat4.multiply(viewProjectionMatrix, camera.viewMatrix, camera.projectionMatrix);
-            mat4.multiply(mvpMatrix, viewProjectionMatrix, objectsToDraw[0].modelMatrix);
+            mat4.multiply(mvpMatrix, viewProjectionMatrix, objectsToDraw[animation.indexOfObjeto].modelMatrix);
             
             gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
             gl.drawArrays(gl.TRIANGLES, 0, vertexData.length / 3);
-            console.log("rot 1: " + objectsToDraw[0].rotationX)
+            console.log("rot 1: " + objectsToDraw[animation.indexOfObjeto].rotationX)
             console.log("deltaTime 1: " + deltaTime);
-            if(objectsToDraw[0].rotationX - animation.rotationBegin <= 60){
+
+            if(objectsToDraw[animation.indexOfObjeto].rotationX - animation.rotationBeginX <= animation.rotationX
+                || objectsToDraw[animation.indexOfObjeto].rotationY - animation.rotationBeginY <= animation.rotationY
+                || objectsToDraw[animation.indexOfObjeto].rotationZ - animation.rotationBeginZ <= animation.rotationZ){
                 requestAnimationFrame(animation.rotate);
             }
             else{
                 then_animation = 0;
-                animation.rotationBegin = 0;
+                animation.rotationBeginX = 0;
                 requestAnimationFrame(drawScene);
             }
         }  
@@ -364,12 +382,10 @@ function main() {
 
     requestAnimationFrame(drawScene);
 
-    function drawScene (now) {
-        now *= 0.001;
-        var deltaTime = now - then;
-        then = now;
-        animation.objeto = objectsToDraw[0];
+    function drawScene () {
+
         objectsToDraw.forEach(function(objeto) {
+            
             gl.useProgram(program);
             gl.bindVertexArray(objeto.vao);
             //gl.enable(gl.CULL_FACE);

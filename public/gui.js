@@ -1,7 +1,12 @@
+const objectFolders = [];
+
 const loadGUI = (gui, guiRoot, camera, animation) => {
   gui.add(guiRoot, "addObject");
   const animationFolder = gui.addFolder("Animation");
-  //animationFolder.add(animation, "rotationX", -180, 180, 15);
+  animationFolder.add(animation, "indexOfObjeto", animation.objetos);
+  animationFolder.add(animation, "rotationX", 0, 360, 15);
+  animationFolder.add(animation, "rotationY", 0, 360, 15);
+  animationFolder.add(animation, "rotationZ", 0, 360, 15);
   animationFolder.add(animation, "animateRotate");
   const cameraFolder = gui.addFolder("Camera");
   const ProjectionFolder = cameraFolder.addFolder("Projection");
@@ -22,6 +27,7 @@ const loadGUI = (gui, guiRoot, camera, animation) => {
 const GUIAddObject = (gui, object, objectsToDraw) => {
   console.log(objectsToDraw);
   const objectFolder = gui.addFolder("Object" + objectsToDraw.length);
+  objectFolders.push(objectFolder);
   const translationFolder = objectFolder.addFolder("Translation");
   translationFolder.add(object, "translationX", -6, 6, 0.3);
   translationFolder.add(object, "translationY", -6, 6, 0.3);
@@ -34,8 +40,4 @@ const GUIAddObject = (gui, object, objectsToDraw) => {
   scaleFolder.add(object, "scaleX", -2, 2, 0.1);
   scaleFolder.add(object, "scaleY", -2, 2, 0.1);
   scaleFolder.add(object, "scaleZ", -2, 2, 0.1);
-};
-
-const GUIWorking = () => {
-  console.log("OBJECT CREATED");
 };
