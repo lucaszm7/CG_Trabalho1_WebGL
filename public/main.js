@@ -448,9 +448,17 @@ function main() {
         },
     }
 
+    const indexOfCameras = [0,1,2];
+    var selectedCamera = {
+        camera: 0,
+    }
     const camera = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 1000);
+    const camera2 = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 1000);
+    const camera3 = new Camera(75, gl.canvas.width/gl.canvas.height, 1, 1000);
+    const cameras = [];
+    cameras.push(camera, camera2, camera3);
     const guiRoot = new GUIRoot(vertexData, program, gl, gui, objectsToDraw);
-    loadGUI(gui, guiRoot, camera, animation);
+    loadGUI(gui, guiRoot, camera, camera2, camera3, selectedCamera, indexOfCameras, animation);
 
     requestAnimationFrame(drawScene);
 
@@ -469,10 +477,10 @@ function main() {
             }
 
             objeto.matrixMultiply();
-            camera.computeView(lookingAt);
-            camera.computeProjection();
+            cameras[selectedCamera.camera].computeView(lookingAt);
+            cameras[selectedCamera.camera].computeProjection();
 
-            mat4.multiply(viewProjectionMatrix, camera.projectionMatrix, camera.viewMatrix);
+            mat4.multiply(viewProjectionMatrix, cameras[selectedCamera.camera].projectionMatrix, cameras[selectedCamera.camera].viewMatrix);
             mat4.multiply(mvpMatrix, viewProjectionMatrix, objeto.modelMatrix);
             gl.uniformMatrix4fv(uniformLocation.mvpMatrix, false, mvpMatrix);
             gl.uniform1i(uniformLocation.changeColors, objeto.changeColors);
